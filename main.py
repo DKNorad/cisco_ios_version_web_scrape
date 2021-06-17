@@ -4,80 +4,147 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.chrome.options import Options
+import time
 
-CHROMEDRIVER_PATH = "chromedriver.exe"
-options = Options()
-options.add_argument('--headless')
-options.add_argument('--disable-gpu')
-options.add_argument('--blink-settings=imagesEnabled=false')
-options.add_argument('log-level=3')
-driver = webdriver.Chrome(CHROMEDRIVER_PATH, options=options)
+IOS_VERSIONS = {'ISR1905': '282977117', 'ISR1906C': '283035751', 'ISR1921': '282977114', 'ISR1941': '282774238',
+                'ISR1941W': '282774241', 'ISR2901': '282774223', 'ISR2911': '282774227', 'ISR2921': '282774229',
+                'ISR2951': '282774230', 'ISR3925': '282774222', 'ISR3945': '282774228', 'ISR3925E': '282896995',
+                'ISR3945E': '282907259'}
+IOSXE_VERSIONS = {'ISR4221': '286310700', 'ISR4321': '286006221', 'ISR4331': '285018115',
+                  'ISR4351': '285018114', 'ISR4431': '284358776', 'ISR4451-X': '284389362', 'ISR4461': '286320564',
+                  'ASR1001-RP1': '282993672', 'ASR1002-RP1': '282046548', 'ASR1004-RP1': '282046548',
+                  'ASR1006-RP1': '282046548', 'ASR1001-HX': '286288843', 'ASR1002-HX': '286288594',
+                  'ASR1001-X': '284932298', 'ASR1002-X': '284146581', 'ASR1004-RP2': '282450665',
+                  'ASR1006-RP2': '282450665', 'ASR1006-X-RP2': '282450665', 'ASR1009-X-RP2': '282450665',
+                  'ASR1012-RP2': '282450665', 'ASR1006-X-RP3': '286308009', 'ASR1009-X-RP3': '286308009',
+                  'ASR1012-RP3': '286308009'}
 
-platform = input('Please choose platform(282907259/type/280805680): ')
-ios_type = input('Please choose IOS type(IOS or IOS-XE): ')
-versions = []
-if ios_type == 'IOS':
-    start, end = input('Please choose start and end version(5/7 for 15.5.3M/15.7.3M): ').split('/')
-    for num in range(int(start), int(end) + 1):
-        for num2 in range(0, 11):
-            if num2 == 0:
-                versions.append(f'15.{num}.3M')
+
+class WebPage:
+    def __init__(self):
+        self.options = Options()
+        self.options.add_argument('--headless')
+        self.options.add_argument('--disable-gpu')
+        self.options.add_argument('log-level=3')
+        self.driver = webdriver.Chrome("chromedriver.exe", options=self.options)
+
+        self.IOS = '280805680'
+        self.IOS_XE = '282046477'
+        self.plat_type = ''
+        self.plat = ''
+        self.platform = ''
+        self.outputs1 = {}
+        self.outputs2 = {}
+        self.suggested_versions = []
+        self.ios_url = ''
+
+    def get_platform(self):
+        # Choose platform and check if it is valid.
+        self.platform = input('Please input device(example: ASR1001-RP1, ISR4431, ISR2911): ').upper()
+        while True:
+            if self.platform in IOS_VERSIONS:
+                self.plat = 'IOS'
+                self.plat_type = IOS_VERSIONS.get(self.platform)
+                break
+            elif self.platform in IOSXE_VERSIONS:
+                self.plat = 'IOS-XE'
+                self.plat_type = IOSXE_VERSIONS.get(self.platform)
+                break
+            print(f'{self.platform} is not a valid device.')
+            self.platform = input('Please input device(example: ASR1001-RP1, ISR4431, ISR2911): ').upper()
+
+    def get_suggested(self):
+        if self.plat == 'IOS':
+            self.ios_url = f'https://software.cisco.com/download/home/{self.plat_type}/type/{self.IOS}/release/'
+        elif self.plat == 'IOS-XE':
+            self.ios_url = f'https://software.cisco.com/download/home/{self.plat_type}/type/{self.IOS_XE}/release/'
+
+        # Open url to the chosen device.
+        self.driver.get(self.ios_url)
+
+        # Get suggested versions names.
+        time.sleep(1)
+        suggested = self.driver.find_element_by_xpath('//app-root/div/main/div/div/app-release-page/div/div[1]/'
+                                                      'app-release-details/nav/div[4]/tree-root/tree-viewport/div/'
+                                                      'div/tree-node-collection/div/tree-node[1]/div')
+        suggested = suggested.text.split('\n')
+        for el in suggested:
+            if el != 'Suggested Release':
+                self.suggested_versions.append(el.replace('(MD)', '').replace('(ED)', ''))
+
+    def get_info(self):
+        self.get_platform()
+        self.get_suggested()
+
+        count = 1
+        for ver in self.suggested_versions:
+            self.driver.get(f'{self.ios_url}{ver}')
+
+            # Wait for the page to load and check if version is available
+            try:
+                wait = WebDriverWait(self.driver, 5)
+                wait.until(EC.presence_of_element_located((By.ID, "image-list")))
+            except:
+                continue
+
+            # Hover over the file name
+            file_name = self.driver.find_element_by_xpath("//span[@class='pointer text-darkgreen']")
+            self.driver.execute_script("arguments[0].scrollIntoView();", file_name)
+            ActionChains(self.driver).move_to_element(file_name).perform()
+
+            # Wait for the popup to load
+            wait = WebDriverWait(self.driver, 10)
+            wait.until(EC.presence_of_element_located((By.ID, "image-overlay-table")))
+
+            # Find the values
+            release_notes = self.driver.find_element_by_xpath('//app-root/div/main/div/div/app-release-page/div/div[2]/'
+                                                              'app-image-details/div[1]/div/div/div[2]/'
+                                                              'release-notes-component/div/ul/li/a')
+            data_in_the_bubble = self.driver.find_element_by_id("image-overlay-table")
+            version = data_in_the_bubble.find_element_by_xpath('//table[@id="image-overlay-table"]/tbody/tr[2]/td[2]')
+            release_date = data_in_the_bubble.find_element_by_xpath('//table[@id="image-overlay-table"]/tbody/tr[3]/td[2]')
+            bin_name = data_in_the_bubble.find_element_by_xpath('//table[@id="image-overlay-table"]/tbody/tr[4]/td[2]')
+            md5 = data_in_the_bubble.find_element_by_xpath('//table[@id="image-overlay-table"]/tbody/tr[7]/td[2]')
+
+            # Add the values as a list entry
+            if count == 1:
+                self.outputs1['version'] = version.text
+                self.outputs1['bin_name'] = bin_name.text
+                self.outputs1['release_date'] = release_date.text
+                self.outputs1['md5'] = md5.text
+                self.outputs1['release_notes'] = release_notes.get_attribute("href")
+                self.outputs1['download_url'] = self.ios_url + ver
             else:
-                versions.append(f'15.{num}.3M{num2}')
-elif ios_type == 'IOS-XE':
-    six_or_seven = input('Please choose 16 or 17: ')
-    if six_or_seven == '16':
-        start, end, max_v = input('Please choose START/END/MAX version(3/12/8 for 16.3.8/16.12.8): ').split('/')
-        for num in range(int(start), int(end) + 1):
-            for num2 in range(1, int(max_v) + 1):
-                if num == 3:
-                    v_name = 'Denali'
-                elif num == 4 or num == 5 or num == 6:
-                    v_name = 'Everest'
-                elif num == 7 or num == 8 or num == 9:
-                    v_name = 'Fuji'
-                elif num == 10 or num == 11 or num == 12:
-                    v_name = 'Gibraltar'
-                versions.append(f'{v_name}-16.{num}.{num2}')
-    elif six_or_seven == '17':
-        start, end, max_v = input('Please choose START/END/MAX version(1/3/8 for 17.1.8/17.3.8): ').split('/')
-        for num in range(int(start), int(end) + 1):
-            for num2 in range(1, int(max_v) + 1):
-                versions.append(f'Amsterdam-17.{num}.{num2}')
+                self.outputs2['version'] = version.text
+                self.outputs2['bin_name'] = bin_name.text
+                self.outputs2['release_date'] = release_date.text
+                self.outputs2['md5'] = md5.text
+                self.outputs2['release_notes'] = release_notes.get_attribute("href")
+                self.outputs2['download_url'] = self.ios_url + ver
+            count += 1
 
-outputs = []
-for ver in versions:
-    driver.get(f"https://software.cisco.com/download/home/{platform}/release/{ver}")
+    def __repr__(self):
+        pass
 
-    # Wait for the page to load and check if version is available
-    try:
-        wait = WebDriverWait(driver, 3)
-        wait.until(EC.presence_of_element_located((By.ID, "image-list")))
-    except:
-        continue
+    def quit(self):
+        self.driver.quit()
 
-    # Hover over the file name
-    file_name = driver.find_element_by_xpath("//span[@class='pointer text-darkgreen']")
-    hov = ActionChains(driver).move_to_element(file_name)
-    hov.perform()
 
-    # Wait for the popup to load
-    wait = WebDriverWait(driver, 10)
-    wait.until(EC.presence_of_element_located((By.ID, "image-overlay-table")))
+web = WebPage()
+web.get_info()
+web.quit()
 
-    # Find the values
-    data_in_the_bubble = driver.find_element_by_id("image-overlay-table")
-    version = data_in_the_bubble.find_element_by_xpath('//table[@id="image-overlay-table"]/tbody/tr[2]/td[2]')
-    md5 = data_in_the_bubble.find_element_by_xpath('//table[@id="image-overlay-table"]/tbody/tr[7]/td[2]')
+print(f'Cisco suggested releases for the {web.platform} are:')
+print(f'Version: {web.outputs1.get("version")}\n'
+      f'File name: {web.outputs1.get("bin_name")}\n'
+      f'Release date: {web.outputs1.get("release_date")}\n'
+      f'MD5: {web.outputs1.get("md5")}\n'
+      f'Release notes: {web.outputs1.get("release_notes")}\n'
+      f'Download link: {web.outputs1.get("download_url")}\n\n')
 
-    # Add the values as a list entry
-    outputs.append(f'{version.text} - {md5.text}')
-    print(f'Info for {version.text} collected')
-driver.quit()
-
-# export the values to a .txt file
-with open('result.txt', 'w') as f:
-    for entry in outputs:
-        f.write('%s\n' % entry)
-
-print('Program complete.')
+print(f'Version: {web.outputs2.get("version")}\n'
+      f'File name: {web.outputs2.get("bin_name")}\n'
+      f'Release date: {web.outputs2.get("release_date")}\n'
+      f'MD5: {web.outputs2.get("md5")}\n'
+      f'Release notes: {web.outputs2.get("release_notes")}\n'
+      f'Download link: {web.outputs2.get("download_url")}\n')
