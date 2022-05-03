@@ -1,5 +1,5 @@
 # Cisco Router IOS/IOS-XE Web Scraper
-
+![GUI](https://i.imgur.com/fa4eLdd.png)
 ### Description:  
 A web scraper that collects the following information about the Cisco suggested releases for the platform chosen.  
 - Version
@@ -20,6 +20,3 @@ The script is currently working with the following routers:
     - ASR1001-RP1, ASR1002-RP1, ASR1004-RP1, ASR1006-RP1
     - ASR1004-RP2, ASR1006-RP2, ASR1006-X-RP2, ASR1009-X-RP2, ASR1012-RP2
     - ASR1006-X-RP3, ASR1009-X-RP3, ASR1012-RP3
-
-
-TODO: Include a GUI with drop-down menus for more convenient use.
