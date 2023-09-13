@@ -5,7 +5,9 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.chrome.options import Options
 from tkinter import *
+from tkinter import ttk
 import time
+import threading
 
 IOS_VERSIONS = {'ISR1905': '282977117', 'ISR1906C': '283035751', 'ISR1921': '282977114', 'ISR1941': '282774238',
                 'ISR1941W': '282774241', 'ISR2901': '282774223', 'ISR2911': '282774227', 'ISR2921': '282774229',
@@ -29,7 +31,7 @@ class WebPage:
         self.options.add_argument('--headless')
         self.options.add_argument('--disable-gpu')
         self.options.add_argument('log-level=3')
-        self.driver = webdriver.Chrome("chromedriver.exe", options=self.options)
+        self.driver = webdriver.Chrome(options=self.options)
 
         self.suggested_versions = []
         self.ios_url = ''
@@ -45,7 +47,7 @@ class WebPage:
 
         # Get suggested versions names.
         time.sleep(1)
-        suggested = self.driver.find_element_by_xpath('//app-root/div/main/div/div/app-release-page/div/div[1]/'
+        suggested = self.driver.find_element('xpath', '//app-root/div/main/div/div/app-release-page/div/div[1]/'
                                                       'app-release-details/nav/div[4]/tree-root/tree-viewport/div/'
                                                       'div/tree-node-collection/div/tree-node[1]/div')
         suggested = suggested.text.split('\n')
@@ -68,7 +70,7 @@ class WebPage:
                 continue
 
             # Hover over the file name
-            file_name = self.driver.find_element_by_xpath("//span[@class='pointer text-darkgreen']")
+            file_name = self.driver.find_element('xpath', "//span[@class='pointer text-darkgreen']")
             self.driver.execute_script("arguments[0].scrollIntoView();", file_name)
             ActionChains(self.driver).move_to_element(file_name).perform()
 
@@ -77,14 +79,15 @@ class WebPage:
             wait.until(EC.presence_of_element_located((By.ID, "image-overlay-table")))
 
             # Find the values
-            release_notes = self.driver.find_element_by_xpath('//app-root/div/main/div/div/app-release-page/div/div[2]/'
+            release_notes = self.driver.find_element('xpath', '//app-root/div/main/div/div/app-release-page/div/div[2]/'
                                                               'app-image-details/div[1]/div/div/div[2]/'
                                                               'release-notes-component/div/ul/li/a')
-            data_in_the_bubble = self.driver.find_element_by_id("image-overlay-table")
-            version = data_in_the_bubble.find_element_by_xpath('//table[@id="image-overlay-table"]/tbody/tr[2]/td[2]')
-            release_date = data_in_the_bubble.find_element_by_xpath('//table[@id="image-overlay-table"]/tbody/tr[3]/td[2]')
-            bin_name = data_in_the_bubble.find_element_by_xpath('//table[@id="image-overlay-table"]/tbody/tr[4]/td[2]')
-            md5 = data_in_the_bubble.find_element_by_xpath('//table[@id="image-overlay-table"]/tbody/tr[7]/td[2]')
+            data_in_the_bubble = self.driver.find_element('id', "image-overlay-table")
+            version = data_in_the_bubble.find_element('xpath', '//table[@id="image-overlay-table"]/tbody/tr[2]/td[2]')
+            release_date = data_in_the_bubble.find_element('xpath',
+                                                           '//table[@id="image-overlay-table"]/tbody/tr[3]/td[2]')
+            bin_name = data_in_the_bubble.find_element('xpath', '//table[@id="image-overlay-table"]/tbody/tr[4]/td[2]')
+            md5 = data_in_the_bubble.find_element('xpath', '//table[@id="image-overlay-table"]/tbody/tr[7]/td[2]')
 
             # Add the values as a list entry
             if count == 1:
@@ -127,6 +130,8 @@ def write_text(model):
                          f'MD5: {outputs2.get("md5")}\n'
                          f'Release notes: {outputs2.get("release_notes")}\n'
                          f'Download link: {outputs2.get("download_url")}\n')
+    ios_pb.stop()
+    ios_xe_pb.stop()
 
 
 # Function for closing the tkinter window
@@ -134,10 +139,11 @@ def close_window():
     window.destroy()
 
 
+window = Tk()
 web = WebPage()
 
 # Defining Tkinter parameters
-window = Tk()
+
 window.title('Cisco IOS/IOS-XE Web Scraper')
 window.geometry("1100x400")
 window.config(background="white")
@@ -146,6 +152,8 @@ window.config(background="white")
 ios_label = Label(window, text='IOS platforms')
 iosxe_label = Label(window, text='IOS-XE platforms')
 output = Text(height=320, width=250, wrap='word')
+ios_pb = ttk.Progressbar(window, orient='horizontal', mode='indeterminate', length=160)
+ios_xe_pb = ttk.Progressbar(window, orient='horizontal', mode='indeterminate', length=160)
 
 dropdown1 = StringVar(window)
 dropdown1.set("ISR1905")  # default value
@@ -155,8 +163,14 @@ dropdown2 = StringVar(window)
 dropdown2.set("ISR4221")  # default value
 dd2 = OptionMenu(window, dropdown2, *IOSXE_VERSIONS)
 
-ios_confirm = Button(window, text="Extract", command=lambda: web.get_info(dropdown1.get(), 280805680), width=10)
-iosxe_confirm = Button(window, text="Extract", command=lambda: web.get_info(dropdown2.get(), 282046477), width=10)
+ios_confirm = Button(window, text="Extract", command=lambda: [
+    ios_pb.start(), threading.Thread(target=web.get_info, args=(dropdown1.get(), 280805680)).start()
+], width=10)
+
+iosxe_confirm = Button(window, text="Extract", command=lambda: [
+    ios_xe_pb.start(), threading.Thread(target=web.get_info, args=(dropdown1.get(), 280805680)).start()
+], width=10)
+
 button_exit = Button(window, text="Exit", command=close_window, width=10)
 
 # Place the elements in the window
@@ -168,6 +182,8 @@ dd1.place(x=10, y=32)
 dd2.place(x=10, y=92)
 output.place(x=100, y=125)
 button_exit.place(x=10, y=370)
+ios_pb.place(x=250, y=33)
+ios_xe_pb.place(x=250, y=93)
 
 # Let the windows wait for any commands
 window.mainloop()
