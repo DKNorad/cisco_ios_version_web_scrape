@@ -29,7 +29,6 @@ class WebPage:
     def __init__(self):
         self.options = Options()
         self.options.add_argument('--headless')
-        self.options.add_argument('--disable-gpu')
         self.options.add_argument('log-level=3')
         self.driver = webdriver.Chrome(options=self.options)
 
