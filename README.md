@@ -1,5 +1,5 @@
 # Cisco Router IOS/IOS-XE Web Scraper
-![GUI](https://i.imgur.com/7QqOCrk.png)  
+![GUI](https://i.imgur.com/yVDQLss.png)  
 
 ### Description:  
 A web scraper that collects the following information about the Cisco suggested releases for the platform chosen.  

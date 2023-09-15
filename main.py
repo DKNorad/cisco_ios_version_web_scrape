@@ -8,25 +8,13 @@ from tkinter import *
 from tkinter import ttk
 import time
 import threading
-
-IOS_VERSIONS = {'ISR1905': '282977117', 'ISR1906C': '283035751', 'ISR1921': '282977114', 'ISR1941': '282774238',
-                'ISR1941W': '282774241', 'ISR2901': '282774223', 'ISR2911': '282774227', 'ISR2921': '282774229',
-                'ISR2951': '282774230', 'ISR3925': '282774222', 'ISR3945': '282774228', 'ISR3925E': '282896995',
-                'ISR3945E': '282907259'}
-IOSXE_VERSIONS = {'ISR4221': '286310700', 'ISR4321': '286006221', 'ISR4331': '285018115',
-                  'ISR4351': '285018114', 'ISR4431': '284358776', 'ISR4451-X': '284389362', 'ISR4461': '286320564',
-                  'ASR1001-RP1': '282993672', 'ASR1002-RP1': '282046548', 'ASR1004-RP1': '282046548',
-                  'ASR1006-RP1': '282046548', 'ASR1001-HX': '286288843', 'ASR1002-HX': '286288594',
-                  'ASR1001-X': '284932298', 'ASR1002-X': '284146581', 'ASR1004-RP2': '282450665',
-                  'ASR1006-RP2': '282450665', 'ASR1006-X-RP2': '282450665', 'ASR1009-X-RP2': '282450665',
-                  'ASR1012-RP2': '282450665', 'ASR1006-X-RP3': '286308009', 'ASR1009-X-RP3': '286308009',
-                  'ASR1012-RP3': '286308009'}
-outputs1 = {}
-outputs2 = {}
+from devices import *
 
 
 class WebPage:
-    def __init__(self):
+    def __init__(self, output_box, progress_bar):
+        self.output_box = output_box
+        self.pb = progress_bar
         self.options = Options()
         self.options.add_argument('--headless')
         self.options.add_argument('log-level=3')
@@ -34,6 +22,7 @@ class WebPage:
 
         self.suggested_versions = []
         self.ios_url = ''
+        self.prints = 0
 
     def get_suggested(self, model, ios_type):
         if model in IOS_VERSIONS:
@@ -55,9 +44,10 @@ class WebPage:
                 self.suggested_versions.append(el.replace('(MD)', '').replace('(ED)', ''))
 
     def get_info(self, model, ios_type):
+        self.pb.start()
+        self.output_box.delete('1.0', END)
         self.get_suggested(model, ios_type)
 
-        count = 1
         for ver in self.suggested_versions:
             self.driver.get(f'{self.ios_url}{ver}')
 
@@ -88,49 +78,29 @@ class WebPage:
             bin_name = data_in_the_bubble.find_element('xpath', '//table[@id="image-overlay-table"]/tbody/tr[4]/td[2]')
             md5 = data_in_the_bubble.find_element('xpath', '//table[@id="image-overlay-table"]/tbody/tr[7]/td[2]')
 
-            # Add the values as a list entry
-            if count == 1:
-                outputs1['version'] = version.text
-                outputs1['bin_name'] = bin_name.text
-                outputs1['release_date'] = release_date.text
-                outputs1['md5'] = md5.text
-                outputs1['release_notes'] = release_notes.get_attribute("href")
-                outputs1['download_url'] = self.ios_url + ver
-            else:
-                outputs2['version'] = version.text
-                outputs2['bin_name'] = bin_name.text
-                outputs2['release_date'] = release_date.text
-                outputs2['md5'] = md5.text
-                outputs2['release_notes'] = release_notes.get_attribute("href")
-                outputs2['download_url'] = self.ios_url + ver
-                write_text(model)
-            count += 1
+            outputs = {'version': version.text, 'bin_name': bin_name.text, 'release_date': release_date.text,
+                       'md5': md5.text, 'release_notes': release_notes.get_attribute("href"),
+                       'download_url': self.ios_url + ver}
+            self.print_info(outputs, len(self.suggested_versions), model)
+
+    def print_info(self, outputs, num_versions, model):
+        if self.prints == 0:
+            self.output_box.insert('end', f'Cisco suggested releases for the {model} are:\n')
+
+        self.output_box.insert('end', f'Version: {outputs.get("version")}\n'
+                                      f'File name: {outputs.get("bin_name")}\n'
+                                      f'Release date: {outputs.get("release_date")}\n'
+                                      f'MD5: {outputs.get("md5")}\n'
+                                      f'Release notes: {outputs.get("release_notes")}\n'
+                                      f'Download link: {outputs.get("download_url")}\n\n')
+        self.prints += 1
+
+        if self.prints == num_versions:
+            self.pb.stop()
+            self.driver.close()
 
     def __repr__(self):
         pass
-
-    # function for closing the web driver
-    def quit(self):
-        self.driver.quit()
-
-
-def write_text(model):
-    output.delete('1.0', END)
-    output.insert('end', f'Cisco suggested releases for the {model} are:\n'
-                         f'Version: {outputs1.get("version")}\n'
-                         f'File name: {outputs1.get("bin_name")}\n'
-                         f'Release date: {outputs1.get("release_date")}\n'
-                         f'MD5: {outputs1.get("md5")}\n'
-                         f'Release notes: {outputs1.get("release_notes")}\n'
-                         f'Download link: {outputs1.get("download_url")}\n\n\n\n'
-                         f'Version: {outputs2.get("version")}\n'
-                         f'File name: {outputs2.get("bin_name")}\n'
-                         f'Release date: {outputs2.get("release_date")}\n'
-                         f'MD5: {outputs2.get("md5")}\n'
-                         f'Release notes: {outputs2.get("release_notes")}\n'
-                         f'Download link: {outputs2.get("download_url")}\n')
-    ios_pb.stop()
-    ios_xe_pb.stop()
 
 
 # Function for closing the tkinter window
@@ -139,51 +109,48 @@ def close_window():
 
 
 window = Tk()
-web = WebPage()
-
 # Defining Tkinter parameters
-
 window.title('Cisco IOS/IOS-XE Web Scraper')
-window.geometry("1100x400")
+window.geometry("1107x662")
 window.config(background="white")
 
-# Create buttons, labels and a text box
+# Create elements
 ios_label = Label(window, text='IOS platforms')
 iosxe_label = Label(window, text='IOS-XE platforms')
-output = Text(height=320, width=250, wrap='word')
-ios_pb = ttk.Progressbar(window, orient='horizontal', mode='indeterminate', length=160)
-ios_xe_pb = ttk.Progressbar(window, orient='horizontal', mode='indeterminate', length=160)
+output = Text(height=30, width=113, wrap='word')
+pb = ttk.Progressbar(window, orient='horizontal', mode='indeterminate', length=700)
 
-dropdown1 = StringVar(window)
-dropdown1.set("ISR1905")  # default value
-dd1 = OptionMenu(window, dropdown1, *IOS_VERSIONS)
+ios_confirm = Button(window, text="Extract", command=lambda: threading.Thread(
+    target=WebPage(output, pb).get_info, args=(ios_cb.get(), 280805680)).start(), width=10)
 
-dropdown2 = StringVar(window)
-dropdown2.set("ISR4221")  # default value
-dd2 = OptionMenu(window, dropdown2, *IOSXE_VERSIONS)
-
-ios_confirm = Button(window, text="Extract", command=lambda: [
-    ios_pb.start(), threading.Thread(target=web.get_info, args=(dropdown1.get(), 280805680)).start()
-], width=10)
-
-iosxe_confirm = Button(window, text="Extract", command=lambda: [
-    ios_xe_pb.start(), threading.Thread(target=web.get_info, args=(dropdown1.get(), 280805680)).start()
-], width=10)
+iosxe_confirm = Button(window, text="Extract", command=lambda: threading.Thread(
+    target=WebPage(output, pb).get_info, args=(ios_xe_cb.get(), 282046477)).start(), width=10)
 
 button_exit = Button(window, text="Exit", command=close_window, width=10)
 
+ios_cb = ttk.Combobox(window)
+ios_cb['values'] = [device for device in IOS_VERSIONS.keys()]
+ios_cb['state'] = 'readonly'
+ios_cb.set(list(IOS_VERSIONS.keys())[0])
+
+ios_xe_cb = ttk.Combobox(window)
+ios_xe_cb['values'] = [device for device in IOSXE_VERSIONS.keys()]
+ios_xe_cb['state'] = 'readonly'
+ios_xe_cb.set(list(IOSXE_VERSIONS.keys())[0])
+
 # Place the elements in the window
-ios_label.place(x=10, y=10)
-iosxe_label.place(x=10, y=70)
-ios_confirm.place(x=140, y=32)
-iosxe_confirm.place(x=140, y=92)
-dd1.place(x=10, y=32)
-dd2.place(x=10, y=92)
-output.place(x=100, y=125)
-button_exit.place(x=10, y=370)
-ios_pb.place(x=250, y=33)
-ios_xe_pb.place(x=250, y=93)
+ios_label.grid(column=0, row=0, sticky=W, padx=5, pady=3)
+ios_cb.grid(column=0, row=1, sticky=W, padx=5, pady=0)
+ios_confirm.grid(column=1, row=1, sticky=W, padx=5, pady=5)
+
+iosxe_label.grid(column=0, row=2, sticky=W, padx=5, pady=3)
+ios_xe_cb.grid(column=0, row=3, sticky=W, padx=5, pady=0)
+iosxe_confirm.grid(column=1, row=3, sticky=W, padx=5, pady=5)
+
+pb.grid(column=2, row=3, sticky=S)
+button_exit.grid(column=0, row=4, sticky=S, padx=5, pady=5, rowspan=2)
+
+output.grid(column=1, row=4, sticky=W, padx=5, pady=5, columnspan=4)
 
 # Let the windows wait for any commands
 window.mainloop()
-web.quit()
