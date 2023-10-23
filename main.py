@@ -12,7 +12,7 @@ from devices import *
 
 
 class WebPage:
-    def __init__(self, output_box, progress_bar):
+    def __init__(self, output_box: Text, progress_bar: ttk.Progressbar):
         self.output_box = output_box
         self.pb = progress_bar
         self.options = Options()
@@ -24,7 +24,7 @@ class WebPage:
         self.ios_url = ''
         self.prints = 0
 
-    def get_suggested(self, model, ios_type):
+    def get_suggested(self, model: str, ios_type: str):
         if model in IOS_VERSIONS:
             self.ios_url = f'https://software.cisco.com/download/home/{IOS_VERSIONS[model]}/type/{ios_type}/release/'
         else:
@@ -43,7 +43,7 @@ class WebPage:
             if el != 'Suggested Release':
                 self.suggested_versions.append(el.replace('(MD)', '').replace('(ED)', ''))
 
-    def get_info(self, model, ios_type):
+    def get_info(self, model: str, ios_type: str):
         self.pb.start()
         self.output_box.delete('1.0', END)
         self.get_suggested(model, ios_type)
@@ -83,7 +83,7 @@ class WebPage:
                        'download_url': self.ios_url + ver}
             self.print_info(outputs, len(self.suggested_versions), model)
 
-    def print_info(self, outputs, num_versions, model):
+    def print_info(self, outputs: dict, num_versions: int, model: str):
         if self.prints == 0:
             self.output_box.insert('end', f'Cisco suggested releases for the {model} are:\n')
 
