@@ -21,10 +21,10 @@ class WebPage:
         self.driver = webdriver.Chrome(options=self.options)
 
         self.suggested_versions = []
-        self.ios_url = ''
-        self.prints = 0
+        self.ios_url: str = ''
+        self.prints: int = 0
 
-    def get_suggested(self, model: str, ios_type: str):
+    def get_suggested(self, model: str, ios_type: str) -> None:
         if model in IOS_VERSIONS:
             self.ios_url = f'https://software.cisco.com/download/home/{IOS_VERSIONS[model]}/type/{ios_type}/release/'
         else:
@@ -43,7 +43,7 @@ class WebPage:
             if el != 'Suggested Release':
                 self.suggested_versions.append(el.replace('(MD)', '').replace('(ED)', ''))
 
-    def get_info(self, model: str, ios_type: str):
+    def get_info(self, model: str, ios_type: str) -> None:
         self.pb.start()
         self.output_box.delete('1.0', END)
         self.get_suggested(model, ios_type)
@@ -83,7 +83,7 @@ class WebPage:
                        'download_url': self.ios_url + ver}
             self.print_info(outputs, len(self.suggested_versions), model)
 
-    def print_info(self, outputs: dict, num_versions: int, model: str):
+    def print_info(self, outputs: dict, num_versions: int, model: str) -> None:
         if self.prints == 0:
             self.output_box.insert('end', f'Cisco suggested releases for the {model} are:\n')
 
@@ -104,7 +104,7 @@ class WebPage:
 
 
 # Function for closing the tkinter window
-def close_window():
+def close_window() -> None:
     window.destroy()
 
 
